@@ -4,11 +4,14 @@ from textwrap import dedent
 import streamlit as st
 from langchain_openai import ChatOpenAI
 
-st.title("AI Tutor: A Simple LLM Chatbot")
-
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
 show_system_prompt = st.sidebar.radio("Show System Prompt?", ("No", "Yes"))
+close_warning = st.sidebar.checkbox("Close Warning", value=False)
+
+st.title("TeachGPT: A Simple LLM Tutor")
+if not close_warning:
+    st.warning("This is a simple AI chatbot using OpenAI's API. Honestly make no guarantees around quality. YMMV.")
 
 TEMPERATURE = 0.7
 MODEL_NAME = "gpt-4o"

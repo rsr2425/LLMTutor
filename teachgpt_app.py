@@ -63,7 +63,7 @@ def generate_response(input_text):
 
 
 with st.form("my_form"):
-    text = st.text_area("Enter text:", "[Topic: [topic name]]")
+    text = st.text_area("Enter text:", "Topic: [topic name]")
     st.info(f"ℹ️ Powered by OpenAI's {MODEL_NAME} model")
     submitted = st.form_submit_button("Submit")
     if not openai_api_key.startswith("sk-"):

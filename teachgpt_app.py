@@ -42,7 +42,7 @@ if "messages" not in st.session_state:
                 "ai",
                 dedent(
                     """
-                    Hello! I am a helpful AI chatbot tutor. What topic would you like to learn? I will ask you a series
+                    Hello! I am an AI chatbot tutor. What topic would you like to learn? I will ask you a series
                     of five questions and then grade you on your responses.
                     
                     Please provide the name of the topic you would like to learn using the format: Topic: [topic name]

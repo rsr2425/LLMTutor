@@ -4,7 +4,7 @@ from textwrap import dedent
 import streamlit as st
 from langchain_openai import ChatOpenAI
 
-st.title("AI Tutor")
+st.title("AI Tutor: A Simple LLM Chatbot")
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 

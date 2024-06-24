@@ -4,18 +4,15 @@ from textwrap import dedent
 import streamlit as st
 from langchain_openai import ChatOpenAI
 
-st.title("TeachGPT: A Chatbot Tutor")
-
+st.title("AI Tutor")
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
-# Toggle to select the input temperature unit
-show_system_prompt = st.sidebar.radio("Show System Prompt?", ("Yes", "No"))
+show_system_prompt = st.sidebar.radio("Show System Prompt?", ("No", "Yes"))
 
 TEMPERATURE = 0.7
 MODEL_NAME = "gpt-4o"
 # MODEL_NAME = "gpt-3.5-turbo"
-
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -43,7 +40,13 @@ if "messages" not in st.session_state:
             ),
             (
                 "ai",
-                "What topic would you like to learn? Please provide the name of the topic you would like to learn using the format: Topic: [topic name]"
+                dedent(
+                    """
+                    Hello! I am a helpful AI chatbot tutor. What topic would you like to learn? I will ask you a series
+                    of five questions and then grade you on your responses.
+                    
+                    Please provide the name of the topic you would like to learn using the format: Topic: [topic name]
+                    """)
             )
         ]
 

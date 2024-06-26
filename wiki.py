@@ -1,16 +1,13 @@
 """
 Convenience functions for interacting with Wikipedia's API.
 """
+from typing import List
+
 import requests
 import wikipediaapi
-from langchain.agents import AgentExecutor
-from langchain.chains.llm import LLMChain
-from langchain.chains.sequential import SimpleSequentialChain
-from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.tools import BaseTool
 
 ARTICLE_NOT_FOUND_MESSAGE = "Article not found or disambiguation error."
-FAKE_WIKI_CONTENT = "This is a fake Wikipedia article. It is not real."
 NUMBER_OF_SEARCH_RESULTS = 5
 USER_AGENT = "WikiGPT (wikigpt777@gmail.com)"
 
@@ -26,82 +23,17 @@ def validate_input(input_text):
         return "Please start your input with 'Topic: ' followed by the topic name.", False
 
 
-class WikipediaChain(SimpleSequentialChain):
-    """Fetches data from wikipedia based on user input."""
-    def __init__(self, agent, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._agent = agent
-        self._previous_titles = []
+# Function to interactively select a Wikipedia article title
+def select_wikipedia_title(titles):
+    print("Please choose the closest topic from the list:")
+    for i, title in enumerate(titles):
+        print(f"{i + 1}: {title}")
 
-    def _call(self, inputs):
-        user_input = inputs['user_input']
-
-        if len(self._previous_titles) == 0:
-            validation_message, is_valid = validate_input(user_input)
-            if is_valid:
-                topic = validation_message
-                search_results = self._agent.run(f"Search Wikipedia for: {topic}")
-                return {"message": f"Search results for '{topic}':\n{search_results}\nEnter the exact title of the article you want to read:"}
-            else:
-                return {"message": validation_message}
-        else:
-            # Handle fetching the article based on previous titles
-            if user_input in self.previous_titles:
-                article_content = self.agent.run(f"Fetch Wikipedia article: {user_input}")
-                if ARTICLE_NOT_FOUND_MESSAGE in article_content:
-                    return {"message": f"'{user_input}' does not exist. Please choose another article or topic."}
-                else:
-                    self.previous_titles = []  # Reset the titles after successful fetch
-                    return {"message": f"Content found.", "content": f"{article_content}"}
-            else:
-                # TODO make it so that user can choose a new topic with 'Topic: [topic name]'
-                return {"message": "Please choose a valid article from the search results."}
+    choice = int(input("Enter the number of the topic: ")) - 1
+    return titles[choice]
 
 
-class WikipediaSearchAgent(AgentExecutor):
-    def __init__(self, agent, tools, memory, *args, **kwargs):
-        super().__init__(agent, tools, *args, **kwargs)
-        self.memory = memory
-
-    def _plan(self, user_input):
-        parsed_input, is_topic = validate_input(user_input)
-        if is_topic:
-            topic = parsed_input
-            return [AgentAction(name="WikipediaSearch", input=topic)]
-        else:
-            return [AgentFinish(return_values={"output": parsed_input}, log="")]
-
-    def _postprocess(self, agent_action: AgentAction, action_result: str):
-        if agent_action.name == "WikipediaSearch":
-            self.memory["article_titles"] = action_result.split('\n')
-            return {"message": f"Search results for '{agent_action.input}':\n{action_result}\nEnter the exact title of the article you want to read:"}
-        else:
-            return {"message": action_result}
-
-
-
-class WikipediaSearchTool(BaseTool):
-    name = "WikipediaSearch"
-    description = "Searches Wikipedia for articles related to a query"
-
-    def _run(self, input: str):
-        query = input
-        return search_wikipedia(query, NUMBER_OF_SEARCH_RESULTS)
-
-
-class WikipediaFetchTool(BaseTool):
-    name = "WikipediaFetch"
-    description = "Fetches a Wikipedia article by title"
-
-    def _run(self, title: str):
-        article = fetch_wikipedia_article(title)
-        if article:
-            return preprocess_text(article)
-        else:
-            return ARTICLE_NOT_FOUND_MESSAGE
-
-
-def search_wikipedia(query, results_limit=5):
+def search_wikipedia(query, results_limit=5) -> List[str]:
     """Returns a list of results_limit Wikipedia titles for a given search query."""
     language_code = 'en'
     search_query = query
@@ -135,3 +67,44 @@ def preprocess_text(text):
     import re
     text = re.sub(r'\[\d+\]', '', text)  # Remove references like [1], [2], etc.
     return text
+
+
+
+
+class WikipediaSearchTool(BaseTool):
+    name = "WikipediaSearch"
+    description = "Searches Wikipedia for articles related to a query"
+
+    def _run(self, input: str):
+        query = input
+        return search_wikipedia(query, NUMBER_OF_SEARCH_RESULTS)
+
+
+class WikipediaFetchTool(BaseTool):
+    name = "WikipediaFetch"
+    description = "Fetches a Wikipedia article by title"
+
+    def _run(self, title: str):
+        article = fetch_wikipedia_article(title)
+        if article:
+            return preprocess_text(article)
+        else:
+            return ARTICLE_NOT_FOUND_MESSAGE
+
+
+class UserInputValidationTool(BaseTool):
+    name = "UserInputValidationTool"
+    description = "Validates the user input format"
+
+    def _run(self, user_input: str):
+        return validate_input(user_input)
+
+
+class SelectionTool(BaseTool):
+    name = "SelectionTool"
+    description = "Prompts user to select a Wikipedia article title"
+
+    def _run(self, titles: list):
+        return select_wikipedia_title(titles)
+
+

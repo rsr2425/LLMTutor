@@ -4,3 +4,6 @@ langchain
 watchdog
 langchain_openai
 streamlit-modal
+wikipedia-api
+requests
+jupyter

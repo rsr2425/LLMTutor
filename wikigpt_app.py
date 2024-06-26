@@ -1,6 +1,6 @@
 import logging
 from textwrap import dedent
-from typing import List
+from typing import List, Tuple
 
 import streamlit as st
 from langchain.agents import initialize_agent, AgentType
@@ -9,7 +9,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_openai import ChatOpenAI
 
 from prompts import qa_generator_template, tutor_template
-from wiki import WikipediaSearchTool, WikipediaFetchTool, WikipediaChain, FAKE_WIKI_CONTENT
+from wiki import validate_input, search_wikipedia, fetch_wikipedia_article
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
@@ -45,24 +45,29 @@ if "tutor_conversation" not in st.session_state:
     st.session_state.tutor_conversation = []
     st.session_state.questions = None
     st.session_state.content = None
-
-    st.session_state.counter = 0
-
-    # search_tool = WikipediaSearchTool()
-    # fetch_tool = WikipediaFetchTool()
-    # tools = [search_tool, fetch_tool]
-    # st.session_state.wiki_agent = initialize_agent(
-    #     tools,
-    #     st.session_state.llm,
-    #     agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    #     verbose=True,
-    # )
-    # st.session_state.wikipediapipeline = WikipediaChain(st.session_state.wiki_agent)
+    st.session_state.topic = None
+    st.session_state.articles = []
+    st.session_state.begun_tutoring = False
 
 
-def generate_wiki_response(input_text: str) -> str:
-    # TODO fake for now
-    return "The importance of renewable energy sources like solar and wind power is increasing as the world seeks to reduce its carbon footprint and combat climate change. Renewable energy sources are not only environmentally friendly but also provide a sustainable alternative to fossil fuels."
+def generate_wiki_response(input_text: str) -> Tuple[str, bool]:
+    if not st.session_state.topic_chosen:
+        validation_result, is_valid = validate_input(input_text)
+        if not is_valid:
+            return validation_result, False
+
+        # if is_valid, validation_result is topic
+        st.session_state.articles = search_wikipedia(validation_result)
+        if len(st.session_state.articles) == 0:
+            return "No search results found. Please select another topic.", False
+
+        st.session_state.topic_chosen = True
+        return "Please select a topic from the list below: \n" + ",\n".join(st.session_state.articles), False
+    elif user_input not in st.session_state.articles:
+        return "Please select a topic from the list below: \n" + ",\n".join(st.session_state.articles), False
+    else:
+        # TODO hard-coded for now to make sure I don't spend a bunch of money sending useless context
+        return fetch_wikipedia_article(input_text)[:8000], True
 
 
 def generate_qa_response(content: str, num_questions=5) -> List[str]:
@@ -96,17 +101,27 @@ with st.form("my_form"):
         st.warning("Please enter a valid OpenAI API key", icon="⚠")
 
     if submitted and openai_api_key.startswith("sk-"):
-        st.session_state.content = generate_wiki_response(user_input)
-        if st.session_state.questions is None:
-            st.session_state.questions = generate_qa_response(st.session_state.content)
-        if len(st.session_state.tutor_conversation) > 0:
-            st.session_state.tutor_conversation.append(("human", user_input))
-        # TODO hard-coded for now
-        if len(st.session_state.tutor_conversation) == 0:
-            st.session_state.tutor_conversation.append(("human", "Topic: Renewable energy sources"))
+        if st.session_state.content is None:
+            wiki_response, content_retrieved = generate_wiki_response(user_input)
+            if content_retrieved:
+                st.session_state.topic = user_input
+                st.session_state.content = wiki_response
+            else:
+                st.session_state.tutor_conversation = [("ai", wiki_response)]
 
-        ai_msg = generate_tutor_response(st.session_state.content, st.session_state.questions)
-        st.session_state.tutor_conversation.append(("ai", ai_msg.content))
+        if st.session_state.content is not None:
+            if st.session_state.questions is None:
+                st.session_state.questions = generate_qa_response(st.session_state.content)
+            # follow-ups
+            if st.session_state.begun_tutoring:
+                st.session_state.tutor_conversation.append(("human", user_input))
+            # initial chat
+            else:
+                st.session_state.begun_tutoring = True
+                st.session_state.tutor_conversation.append(("human", f"Topic: {st.session_state.topic}"))
+
+            ai_msg = generate_tutor_response(st.session_state.content, st.session_state.questions)
+            st.session_state.tutor_conversation.append(("ai", ai_msg.content))
 
 
 conversation = [WELCOME_MESSAGE] + st.session_state.tutor_conversation
@@ -118,3 +133,4 @@ for msg in conversation[::-1]:
 
 
 st.write(f"Debugging! Tutor Convo: {st.session_state.tutor_conversation}")
+st.write(f"Debugging! Content: {st.session_state.content}")

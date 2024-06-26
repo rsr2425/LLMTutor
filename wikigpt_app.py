@@ -3,7 +3,6 @@ from textwrap import dedent
 from typing import List, Tuple
 
 import streamlit as st
-from langchain.agents import initialize_agent, AgentType
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_openai import ChatOpenAI
@@ -32,6 +31,8 @@ WELCOME_MESSAGE = (
             """
             Hello! I am an AI chatbot tutor. What topic would you like to learn? I will ask you a series
             of five questions and then grade you on your responses.
+            
+            The questions will be based on the topic of your choosing, fetched from Wikipedia.
     
             Please provide the name of the topic you would like to learn using the format: Topic: [topic name]
             """)
@@ -130,7 +131,3 @@ for msg in conversation[::-1]:
         st.info(f"👤 {msg[1]}")
     elif msg[0] == "ai":
         st.info(f"🤖 {msg[1]}")
-
-
-st.write(f"Debugging! Tutor Convo: {st.session_state.tutor_conversation}")
-st.write(f"Debugging! Content: {st.session_state.content}")

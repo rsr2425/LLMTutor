@@ -12,7 +12,6 @@ from wiki import validate_input, search_wikipedia, fetch_wikipedia_article
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
-show_system_prompt = st.sidebar.radio("Show System Prompt?", ("No", "Yes"))
 close_warning = st.sidebar.checkbox("Close Warning", value=False)
 
 st.title("WikiGPT: A Simple LLM Tutor")

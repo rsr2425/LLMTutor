@@ -3,23 +3,27 @@ from textwrap import dedent
 from typing import List, Tuple
 
 import streamlit as st
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain_openai import ChatOpenAI
 
 from prompts import qa_generator_template, tutor_template
 from wiki import validate_input, search_wikipedia, fetch_wikipedia_article
 
+
+TEMPERATURE = 0.7
+MODEL_NAME = "gpt-4o"
+
+
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
+show_token_usage = st.sidebar.checkbox("Close Token Usage", value=False)
 close_warning = st.sidebar.checkbox("Close Warning", value=False)
 
 st.title("WikiGPT: A Simple LLM Tutor")
 if not close_warning:
     st.warning("This is a simple AI chatbot using OpenAI's API. Honestly make no guarantees around quality. YMMV.")
-
-TEMPERATURE = 0.7
-MODEL_NAME = "gpt-4o"
 
 if "topic_chosen" not in st.session_state:
     st.session_state.topic_chosen = False
@@ -37,9 +41,13 @@ WELCOME_MESSAGE = (
             """)
     )
 
-if "tutor_conversation" not in st.session_state:
+if "token_count" not in st.session_state:
+    st.session_state.token_count = 0
+
     llm = ChatOpenAI(model_name=MODEL_NAME, temperature=TEMPERATURE, openai_api_key=openai_api_key)
-    st.session_state.qa_generator_chain = qa_generator_template | llm | JsonOutputParser()
+
+    json_runnable = RunnableParallel(passed=RunnablePassthrough(), output=JsonOutputParser())
+    st.session_state.qa_generator_chain = qa_generator_template | llm | json_runnable
     st.session_state.tutor_chain = tutor_template | llm
 
     st.session_state.tutor_conversation = []
@@ -77,17 +85,20 @@ def generate_qa_response(content: str, num_questions=5) -> List[str]:
             "num_questions": num_questions
         }
     )
-    return response["questions"]
+    st.session_state.token_count += response['passed'].usage_metadata['total_tokens']
+    return response['output']['questions']
 
 
 def generate_tutor_response(content: str, questions: List[str]) -> BaseMessage:
-    return st.session_state.tutor_chain.invoke(
+    response = st.session_state.tutor_chain.invoke(
         {
             "content": content,
             "questions": questions,
             "conversations": st.session_state.tutor_conversation
         }
     )
+    st.session_state.token_count += response.usage_metadata['total_tokens']
+    return response
 
 
 # 1) Fetch content from Wikipedia
@@ -130,3 +141,5 @@ for msg in conversation[::-1]:
         st.info(f"👤 {msg[1]}")
     elif msg[0] == "ai":
         st.info(f"🤖 {msg[1]}")
+if show_token_usage:
+    st.info(f"Running token count: {st.session_state.token_count}")

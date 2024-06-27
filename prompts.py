@@ -30,7 +30,7 @@ TUTOR_SYSTEM_PROMPT = dedent("""
 
 QA_GEN_SYSTEM_PROMPT_TEMPLATE = dedent("""
     You are a friendly question suggestion generator AI. You will generate up to {num_questions} questions based on the content
-    provided.
+    provided. The questions should be more conceptual and not test the user on very specific details.
 
     Only generate json responses. For instance, if you need to generate 3 questions, the output should look like this.
 

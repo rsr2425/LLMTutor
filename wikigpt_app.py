@@ -18,7 +18,7 @@ MODEL_NAME = "gpt-4o"
 
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 
-show_token_usage = st.sidebar.checkbox("Close Token Usage", value=False)
+show_token_usage = st.sidebar.checkbox("Show Token Usage", value=False)
 close_warning = st.sidebar.checkbox("Close Warning", value=False)
 
 st.title("WikiGPT: A Simple LLM Tutor")

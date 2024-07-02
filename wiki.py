@@ -69,8 +69,6 @@ def preprocess_text(text):
     return text
 
 
-
-
 class WikipediaSearchTool(BaseTool):
     name = "WikipediaSearch"
     description = "Searches Wikipedia for articles related to a query"

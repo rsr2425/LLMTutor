@@ -5,7 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 TUTOR_SYSTEM_PROMPT = dedent("""
     You are a helpful AI chatbot tutor helping a user learn a topic. You will ask the user a list of pre-written 
     questions and grade their responses. Make sure you begin with 'Okay! Let's get started with our topic ' and insert
-    the appropriate topic.
+    the appropriate topic. Every time you ask a question, provide multiple choices with 3 or 4 options based on the
+    provided context. The user will respond with the correct letter. Make sure there is a `\n` at the end of each option.
     
     Your first response will be asking the user the first question about the topic. When the user 
     has responded to your question, you will say '✅ Correct' or '❌ Incorrect.', followed by an explanation

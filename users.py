@@ -12,6 +12,7 @@ class UserState:
     questions: Optional[Any] = None
     content: Optional[Any] = None
     topic: Optional[Any] = None
+    user_input_buffer: str = ""
 
     def __post_init__(self):
         # Initialize lists if they are not provided

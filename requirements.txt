@@ -9,4 +9,4 @@ wikipedia-api
 requests
 jupyter
 tiktoken
-
+wikipedia

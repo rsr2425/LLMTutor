@@ -1,9 +1,8 @@
-import logging
 from textwrap import dedent
 from typing import List, Tuple
 
 import streamlit as st
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 
 from users import UserState
 from wiki_chains import build_qa_generator_chain, build_tutor_chain
@@ -17,13 +16,17 @@ openai_api_key = st.secrets["OPENAI_API_KEY"]
 show_token_usage = st.sidebar.checkbox("Show Token Usage", value=False)
 close_warning = st.sidebar.checkbox("Close Warning", value=False)
 
+# app config
+# st.set_page_config(page_title="WikiGPT", page_icon="🤖")
+# st.title("WikiGPT")
+
 st.title("WikiGPT: A Simple LLM Tutor")
 if not close_warning:
     st.warning("This is a simple AI chatbot using OpenAI's API. Honestly make no guarantees around quality. YMMV.")
 
 WELCOME_MESSAGE = (
-        "ai",
-        dedent(
+    AIMessage(
+        content=dedent(
             """
             Hello! I am an AI chatbot tutor. What topic would you like to learn? I will ask you a series
             of five questions and then grade you on your responses.
@@ -31,14 +34,34 @@ WELCOME_MESSAGE = (
             The questions will be based on the topic of your choosing, fetched from Wikipedia.
     
             Please provide the name of the topic you would like to learn using the format: Topic: [topic name]
-            """)
+            """
+        )
     )
+)
 
 if "user_state" not in st.session_state:
     st.session_state.user_state = UserState()
 
     st.session_state.qa_generator_chain = build_qa_generator_chain(MODEL_NAME, TEMPERATURE, openai_api_key)
     st.session_state.tutor_chain = build_tutor_chain(MODEL_NAME, TEMPERATURE, openai_api_key)
+
+
+# render convo
+conversation = [WELCOME_MESSAGE] + st.session_state.user_state.tutor_conversation
+for message in conversation:
+    if isinstance(message, AIMessage):
+        with st.chat_message("AI"):
+            st.write(message.content)
+    elif isinstance(message, HumanMessage):
+        with st.chat_message("Human"):
+            st.write(message.content)
+# for msg in conversation[::-1]:
+#     if msg[0] == "human":
+#         st.info(f"👤 {msg[1]}")
+#     elif msg[0] == "ai":
+#         st.info(f"🤖 {msg[1]}")
+# if show_token_usage:
+#     st.info(f"Running token count: {st.session_state.user_state.token_count}")
 
 
 def generate_wiki_response(input_text: str) -> Tuple[str, bool]:
@@ -73,16 +96,27 @@ def generate_qa_response(content: str, num_questions=5) -> List[str]:
 
 
 def generate_tutor_response(content: str, questions: List[str]) -> BaseMessage:
-    response = st.session_state.tutor_chain.invoke(
+    response = st.session_state.tutor_chain.stream(
         {
             "content": content,
             "questions": questions,
             "conversations": st.session_state.user_state.tutor_conversation
         }
     )
-    st.session_state.user_state.token_count += response.usage_metadata['total_tokens']
+    # st.session_state.user_state.token_count += response.usage_metadata['total_tokens']
     return response
 
+
+if st.session_state.user_state.user_input_buffer != "":
+    with st.chat_message("Human"):
+        user_input = st.session_state.user_state.user_input_buffer
+        st.session_state.user_state.user_input_buffer = ""
+        st.markdown(user_input)
+        st.session_state.user_state.tutor_conversation.append(HumanMessage(content=user_input))
+
+    with st.chat_message("AI"):
+        response = st.write_stream(generate_tutor_response(user_input, st.session_state.user_state.questions))
+        st.session_state.user_state.tutor_conversation.append(AIMessage(content=response))
 
 # 1) Fetch content from Wikipedia
 # 2) Generate questions
@@ -99,28 +133,17 @@ with st.form("my_form"):
                 st.session_state.user_state.topic = user_input
                 st.session_state.user_state.content = wiki_response
             else:
-                st.session_state.user_state.tutor_conversation = [("ai", wiki_response)]
+                st.session_state.user_state.tutor_conversation = [AIMessage(content=wiki_response)]
 
         if st.session_state.user_state.content is not None:
             if st.session_state.user_state.questions is None:
                 st.session_state.user_state.questions = generate_qa_response(st.session_state.user_state.content)
             # follow-ups
             if st.session_state.user_state.begun_tutoring:
-                st.session_state.user_state.tutor_conversation.append(("human", user_input))
+                if st.session_state.user_state.user_input_buffer == "":
+                    st.session_state.user_state.user_input_buffer = user_input
             # initial chat
             else:
                 st.session_state.user_state.begun_tutoring = True
-                st.session_state.user_state.tutor_conversation.append(("human", f"Topic: {st.session_state.user_state.topic}"))
+                st.session_state.user_state.tutor_conversation.append(HumanMessage(content=f"Topic: {st.session_state.user_state.topic}"))
 
-            ai_msg = generate_tutor_response(st.session_state.user_state.content, st.session_state.user_state.questions)
-            st.session_state.user_state.tutor_conversation.append(("ai", ai_msg.content))
-
-
-conversation = [WELCOME_MESSAGE] + st.session_state.user_state.tutor_conversation
-for msg in conversation[::-1]:
-    if msg[0] == "human":
-        st.info(f"👤 {msg[1]}")
-    elif msg[0] == "ai":
-        st.info(f"🤖 {msg[1]}")
-if show_token_usage:
-    st.info(f"Running token count: {st.session_state.user_state.token_count}")
